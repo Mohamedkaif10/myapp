@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:archive/archive_io.dart';
 import 'dart:io';
-import 'package:flutter_easyloading/flutter_easyloading.dart';
 
 class ImageSequencePage extends StatefulWidget {
-  final String folderName; // e.g., "John_45"
+  final String folderName;
   const ImageSequencePage({super.key, required this.folderName});
 
   @override
@@ -37,6 +35,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
   int currentStep = 0;
   XFile? capturedImage;
   final ImagePicker picker = ImagePicker();
+  bool _isLoading = false;
 
   Future<void> captureImage() async {
     final XFile? image = await picker.pickImage(source: ImageSource.camera);
@@ -66,37 +65,49 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
   }
 
   Future<void> zipFolder() async {
-    EasyLoading.show(status: 'Zipping...');
+    setState(() {
+      _isLoading = true;
+    });
 
-    final folderPath =
-        '/storage/emulated/0/Documents/myapp/${widget.folderName}';
-    final zipFilePath =
-        '/storage/emulated/0/Documents/myapp/${widget.folderName}.zip'; // OUTSIDE the folder
+    try {
+      final folderPath = '/storage/emulated/0/Documents/myapp/${widget.folderName}';
+      final zipFilePath = '/storage/emulated/0/Documents/myapp/${widget.folderName}.zip';
 
-    final zipEncoder = ZipFileEncoder();
-    zipEncoder.create(zipFilePath);
-    zipEncoder.addDirectory(Directory(folderPath));
-    zipEncoder.close();
+      final zipEncoder = ZipFileEncoder();
+      zipEncoder.create(zipFilePath);
+      await zipEncoder.addDirectory(Directory(folderPath));
+      zipEncoder.close();
 
-    EasyLoading.dismiss();
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.green[600],
-          content: Row(
-            children: const [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 10),
-              Expanded(child: Text('Thank you! All data captured and zipped.')),
-            ],
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green[600],
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 10),
+                Expanded(child: Text('Thank you! All data captured and zipped.')),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            duration: const Duration(seconds: 3),
           ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          duration: Duration(seconds: 3),
-        ),
-      );
-      Navigator.pop(context);
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error zipping files: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -105,16 +116,16 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
     final instruction = instructions[currentStep];
     final referenceImagePath = referenceImages[instruction];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Step ${currentStep + 1} of ${instructions.length}'),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF3FBF8B),
-        foregroundColor: Colors.white,
-      ),
-      body: Stack(
-        children: [
-          Padding(
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: Text('Step ${currentStep + 1} of ${instructions.length}'),
+            centerTitle: true,
+            backgroundColor: const Color(0xFF3FBF8B),
+            foregroundColor: Colors.white,
+          ),
+          body: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
@@ -159,8 +170,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                         if (capturedImage != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(File(capturedImage!.path),
-                                height: 250),
+                            child: Image.file(File(capturedImage!.path), height: 250),
                           )
                         else
                           const Text('No image captured yet'),
@@ -202,7 +212,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                               capturedImage = null;
                             });
                           } else {
-                            await zipFolder(); // Call zip logic
+                            await zipFolder();
                           }
                         },
                         icon: const Icon(Icons.save),
@@ -224,8 +234,39 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
               ],
             ),
           ),
-        ],
-      ),
+        ),
+        if (_isLoading)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3FBF8B)),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Zipping...',
+                      style: TextStyle(
+                        color: Colors.grey[800],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
