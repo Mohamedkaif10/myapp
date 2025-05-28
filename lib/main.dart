@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:excel/excel.dart' show Excel, CellValue, TextCellValue;
 import 'dart:io';
 import 'image_sequence_page.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      builder: EasyLoading.init(),
       home: const PatientEntryPage(),
     );
   }
@@ -51,7 +53,6 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
       return;
     }
 
-    // Request permissions
     if (!await _requestPermissions()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Storage permission denied')),
@@ -60,8 +61,18 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
     }
 
     try {
-      final directory = await getExternalStorageDirectory();
-      final filePath = "${directory!.path}/patients_data.xlsx";
+      // Generate folder name
+      final folderName =
+          "${name.replaceAll(' ', '_')}_${phone.substring(phone.length - 2)}";
+
+      // Set path to: /storage/emulated/0/Documents/myapp/{folderName}
+      final baseDir = Directory('/storage/emulated/0/Documents/myapp');
+      final patientFolder = Directory('${baseDir.path}/$folderName');
+      if (!await patientFolder.exists()) {
+        await patientFolder.create(recursive: true);
+      }
+
+      final filePath = "${patientFolder.path}/patients_data.xlsx";
       final file = File(filePath);
       Excel excel;
 
@@ -90,22 +101,28 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
       await file.writeAsBytes(fileBytes!);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Data saved to: $filePath')),
+        SnackBar(content: Text('Excel saved to: $filePath')),
       );
 
-      String folderName = "${name.replaceAll(' ', '_')}_${phone.substring(phone.length - 2)}";
-
       if (context.mounted) {
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ImageSequencePage(folderName: folderName),
           ),
         );
+
+// Clear fields after returning
+        nameController.clear();
+        ageController.clear();
+        phoneController.clear();
+        setState(() {
+          selectedGender = 'Male';
+        });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving data: $e')),
+        SnackBar(content: Text('Error saving Excel: $e')),
       );
     }
   }
@@ -140,7 +157,8 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
             DropdownButtonFormField<String>(
               value: selectedGender,
               items: ['Male', 'Female', 'Other']
-                  .map((gender) => DropdownMenuItem(value: gender, child: Text(gender)))
+                  .map((gender) =>
+                      DropdownMenuItem(value: gender, child: Text(gender)))
                   .toList(),
               onChanged: (value) {
                 setState(() {
