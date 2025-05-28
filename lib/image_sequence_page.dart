@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:archive/archive_io.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 class ImageSequencePage extends StatefulWidget {
   final String folderName;
   const ImageSequencePage({super.key, required this.folderName});
@@ -73,14 +74,16 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
   }
 
 Future<void> zipFolder() async {
-  setState(() {
-    _isLoading = true;
-  });
+  EasyLoading.show(status: 'Zipping images...'); // Show loader
 
   try {
     await compute(zipFolderInBackground, widget.folderName);
 
     if (context.mounted) {
+      EasyLoading.dismiss(); // Dismiss loader
+
+      EasyLoading.showSuccess('Zipped successfully!');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.green[600],
@@ -96,19 +99,16 @@ Future<void> zipFolder() async {
           duration: const Duration(seconds: 3),
         ),
       );
+
       Navigator.pop(context);
     }
   } catch (e) {
+    EasyLoading.dismiss();
     if (context.mounted) {
+      EasyLoading.showError('Error zipping files');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error zipping files: $e')),
       );
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 }

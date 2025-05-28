@@ -8,7 +8,6 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 
 void main() {
   runApp(const MyApp());
-  EasyLoading.init();
 }
 
 class MyApp extends StatelessWidget {
@@ -24,6 +23,7 @@ class MyApp extends StatelessWidget {
       ),
        
       home: const PatientEntryPage(),
+       builder: EasyLoading.init(),
     );
   }
 }
