@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:archive/archive_io.dart';
 import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 class ImageSequencePage extends StatefulWidget {
   final String folderName;
   const ImageSequencePage({super.key, required this.folderName});
@@ -10,7 +10,15 @@ class ImageSequencePage extends StatefulWidget {
   @override
   State<ImageSequencePage> createState() => _ImageSequencePageState();
 }
+Future<void> zipFolderInBackground(String folderName) async {
+  final folderPath = '/storage/emulated/0/Documents/myapp/$folderName';
+  final zipFilePath = '/storage/emulated/0/Documents/myapp/${folderName}.zip';
 
+  final zipEncoder = ZipFileEncoder();
+  zipEncoder.create(zipFilePath);
+  await zipEncoder.addDirectory(Directory(folderPath));
+  zipEncoder.close();
+}
 class _ImageSequencePageState extends State<ImageSequencePage> {
   final List<String> instructions = [
     'Front teeth (closed bite)',
@@ -64,52 +72,46 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
     await File(capturedImage!.path).copy(path);
   }
 
-  Future<void> zipFolder() async {
-    setState(() {
-      _isLoading = true;
-    });
+Future<void> zipFolder() async {
+  setState(() {
+    _isLoading = true;
+  });
 
-    try {
-      final folderPath = '/storage/emulated/0/Documents/myapp/${widget.folderName}';
-      final zipFilePath = '/storage/emulated/0/Documents/myapp/${widget.folderName}.zip';
+  try {
+    await compute(zipFolderInBackground, widget.folderName);
 
-      final zipEncoder = ZipFileEncoder();
-      zipEncoder.create(zipFilePath);
-      await zipEncoder.addDirectory(Directory(folderPath));
-      zipEncoder.close();
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green[600],
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(child: Text('Thank you! All data captured and zipped.')),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            duration: const Duration(seconds: 3),
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green[600],
+          content: Row(
+            children: const [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 10),
+              Expanded(child: Text('Thank you! All data captured and zipped.')),
+            ],
           ),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error zipping files: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      Navigator.pop(context);
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error zipping files: $e')),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
