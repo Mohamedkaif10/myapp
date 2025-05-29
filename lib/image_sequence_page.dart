@@ -218,7 +218,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                         },
                         icon: const Icon(Icons.flip),
                         label: Text(
-                          isMirrored ? 'Original' : 'Show Mirror Image',
+                          isMirrored ? 'Original' : 'Mirror',
                           style: const TextStyle(color: Color(0xFF7F56D9)),
                         ),
                         style: OutlinedButton.styleFrom(
