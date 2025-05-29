@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:excel/excel.dart' show Excel, CellValue, TextCellValue;
+import 'package:excel/excel.dart' show Excel, TextCellValue;
 import 'dart:io';
 import 'image_sequence_page.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -21,9 +20,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-       
       home: const PatientEntryPage(),
-       builder: EasyLoading.init(),
+      builder: EasyLoading.init(),
     );
   }
 }
@@ -50,6 +48,13 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
     if (name.isEmpty || age.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    if (phone.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone number must be exactly 10 digits')),
       );
       return;
     }
