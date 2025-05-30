@@ -1,26 +1,6 @@
 import 'package:flutter/material.dart';
 import 'patient_entry_page.dart';
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OralVis App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
-      home: const ClinicEntryPage(),
-    );
-  }
-}
-
 class ClinicEntryPage extends StatefulWidget {
   const ClinicEntryPage({super.key});
 
@@ -30,13 +10,6 @@ class ClinicEntryPage extends StatefulWidget {
 
 class _ClinicEntryPageState extends State<ClinicEntryPage> {
   final TextEditingController _clinicNameController = TextEditingController();
-  late final int _clinicId;
-
-  @override
-  void initState() {
-    super.initState();
-    _clinicId = 10000 + DateTime.now().millisecondsSinceEpoch % 90000; // ✅ 5-digit clinic ID
-  }
 
   void _proceed() {
     final name = _clinicNameController.text.trim();
@@ -47,13 +20,12 @@ class _ClinicEntryPageState extends State<ClinicEntryPage> {
       return;
     }
 
+    final clinicId = 10000 + DateTime.now().millisecondsSinceEpoch % 90000;
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PatientEntryPage(
-          clinicName: name,
-          clinicId: _clinicId,
-        ),
+        builder: (_) => PatientEntryPage(clinicName: name, clinicId: clinicId),
       ),
     );
   }
@@ -70,20 +42,11 @@ class _ClinicEntryPageState extends State<ClinicEntryPage> {
               controller: _clinicNameController,
               decoration: const InputDecoration(labelText: 'Clinic Name'),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              enabled: false,
-              decoration: InputDecoration(
-                labelText: 'Clinic ID',
-                border: const OutlineInputBorder(),
-                hintText: _clinicId.toString(),
-              ),
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _proceed,
               child: const Text('Proceed'),
-            ),
+            )
           ],
         ),
       ),
