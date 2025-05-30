@@ -61,36 +61,39 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
       });
     }
   }
-final GlobalKey _imageKey = GlobalKey();
 
- Future<void> saveImageLocally() async {
-  const clinicId = 132;
-  const patientId = 14;
-  final serialNumber = currentStep + 1;
+  final GlobalKey _imageKey = GlobalKey();
 
-  final baseDir = Directory('/storage/emulated/0/Documents/myapp');
-  final patientFolder = Directory('${baseDir.path}/${widget.folderName}');
-  if (!await patientFolder.exists()) {
-    await patientFolder.create(recursive: true);
+  Future<void> saveImageLocally() async {
+    const clinicId = 132;
+    const patientId = 14;
+    final serialNumber = currentStep + 1;
+
+    final baseDir = Directory('/storage/emulated/0/Documents/myapp');
+    final patientFolder = Directory('${baseDir.path}/${widget.folderName}');
+    if (!await patientFolder.exists()) {
+      await patientFolder.create(recursive: true);
+    }
+
+    final fileName = '${clinicId}_${patientId}_$serialNumber.jpg';
+    final path = '${patientFolder.path}/$fileName';
+
+    try {
+      RenderRepaintBoundary boundary =
+          _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData!.buffer.asUint8List();
+
+      final file = File(path);
+      await file.writeAsBytes(pngBytes);
+
+      print('Saved transformed image to $path');
+    } catch (e) {
+      print('Failed to save transformed image: $e');
+    }
   }
-
-  final fileName = '${clinicId}_${patientId}_$serialNumber.jpg';
-  final path = '${patientFolder.path}/$fileName';
-
-  try {
-    RenderRepaintBoundary boundary = _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    final pngBytes = byteData!.buffer.asUint8List();
-
-    final file = File(path);
-    await file.writeAsBytes(pngBytes);
-
-    print('Saved transformed image to $path');
-  } catch (e) {
-    print('Failed to save transformed image: $e');
-  }
-}
 
   Future<void> zipFolder() async {
     EasyLoading.show(status: 'Zipping images...');
@@ -132,14 +135,16 @@ final GlobalKey _imageKey = GlobalKey();
   Matrix4 getTransformForStep(int step, bool isMirrored) {
     if (!isMirrored) return Matrix4.identity();
 
-    // Customize behavior per step
-    if (step == 3) {
-      // Step 4 → Flip vertically
+    if (step == 3 || step == 4) {
+      // Flip vertically
       return Matrix4.identity()..scale(1.0, -1.0);
-    } else {
-      // Other steps → Mirror horizontally
+    } else if (step == 1 || step == 2) {
+      // Mirror horizontally
       return Matrix4.identity()..scale(-1.0, 1.0);
     }
+
+    // No transform for other steps
+    return Matrix4.identity();
   }
 
   @override
@@ -199,20 +204,21 @@ final GlobalKey _imageKey = GlobalKey();
                         ),
                         const SizedBox(height: 20),
                         if (capturedImage != null)
-  RepaintBoundary(
-    key: _imageKey,
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Transform(
-        alignment: Alignment.center,
-        transform: getTransformForStep(currentStep, isMirrored),
-        child: Image.file(File(capturedImage!.path), height: 250),
-      ),
-    ),
-  )
-else
-  const Text('No image captured yet'),
-
+                          RepaintBoundary(
+                            key: _imageKey,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform: getTransformForStep(
+                                    currentStep, isMirrored),
+                                child: Image.file(File(capturedImage!.path),
+                                    height: 250),
+                              ),
+                            ),
+                          )
+                        else
+                          const Text('No image captured yet'),
                       ],
                     ),
                   ),
@@ -235,27 +241,33 @@ else
                               borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            isMirrored = !isMirrored;
-                          });
-                        },
-                        icon: const Icon(Icons.flip),
-                        label: Text(
-                          isMirrored
-                              ? 'Original'
-                              : (currentStep == 3 ? 'Flip' : 'Mirror'),
-                          style: const TextStyle(color: Color(0xFF7F56D9)),
+                      if (currentStep == 1 ||
+                          currentStep == 2 ||
+                          currentStep == 3 ||
+                          currentStep == 4)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              isMirrored = !isMirrored;
+                            });
+                          },
+                          icon: const Icon(Icons.flip),
+                          label: Text(
+                            isMirrored
+                                ? 'Original'
+                                : (currentStep == 3 || currentStep == 4
+                                    ? 'Flip'
+                                    : 'Mirror'),
+                            style: const TextStyle(color: Color(0xFF7F56D9)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF7F56D9)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF7F56D9)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
                       ElevatedButton.icon(
                         onPressed: () async {
                           await saveImageLocally();
