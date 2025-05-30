@@ -39,6 +39,8 @@ dependencies:
   archive: ^3.6.1
   flutter_easyloading: ^3.0.5
   dart_style: ^3.1.0
+  shared_preferences: ^2.5.3
+  sqflite: ^2.4.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
