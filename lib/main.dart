@@ -35,7 +35,8 @@ class _ClinicEntryPageState extends State<ClinicEntryPage> {
   @override
   void initState() {
     super.initState();
-    _clinicId = 10000 + DateTime.now().millisecondsSinceEpoch % 90000; // ✅ 5-digit clinic ID
+    _clinicId = 10000 +
+        DateTime.now().millisecondsSinceEpoch % 90000; // ✅ 5-digit clinic ID
   }
 
   void _proceed() {

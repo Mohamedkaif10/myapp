@@ -7,17 +7,18 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'patient_entry_page.dart';
+
 class ImageSequencePage extends StatefulWidget {
   final String folderName;
- final int clinicId;
-final int patientId;
+  final int clinicId;
+  final int patientId;
 
-const ImageSequencePage({
-  super.key,
-  required this.folderName,
-  required this.clinicId,
-  required this.patientId,
-});
+  const ImageSequencePage({
+    super.key,
+    required this.folderName,
+    required this.clinicId,
+    required this.patientId,
+  });
   @override
   State<ImageSequencePage> createState() => _ImageSequencePageState();
 }
@@ -101,55 +102,56 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
     }
   }
 
- Future<void> zipFolder() async {
-  EasyLoading.show(status: 'Zipping images...');
-  try {
-    await compute(zipFolderInBackground, widget.folderName);
-    if (context.mounted) {
+  Future<void> zipFolder() async {
+    EasyLoading.show(status: 'Zipping images...');
+    try {
+      await compute(zipFolderInBackground, widget.folderName);
+      if (context.mounted) {
+        EasyLoading.dismiss();
+        EasyLoading.showSuccess('Zipped successfully!');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.green[600],
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 10),
+                Expanded(
+                    child: Text('Thank you! All data captured and zipped.')),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Pop back to ClinicEntryPage and go forward to PatientEntryPage
+        Navigator.of(context).pop(); // pop ImageSequencePage
+        Navigator.of(context).pop(); // pop PatientEntryPage
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PatientEntryPage(
+              clinicName: 'Unknown',
+              clinicId: widget.clinicId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
       EasyLoading.dismiss();
-      EasyLoading.showSuccess('Zipped successfully!');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.green[600],
-          content: Row(
-            children: const [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 10),
-              Expanded(child: Text('Thank you! All data captured and zipped.')),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-
-      // Pop back to ClinicEntryPage and go forward to PatientEntryPage
-      Navigator.of(context).pop(); // pop ImageSequencePage
-      Navigator.of(context).pop(); // pop PatientEntryPage
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PatientEntryPage(
-            clinicName: 'Unknown',
-            clinicId: widget.clinicId,
-          ),
-        ),
-      );
-    }
-  } catch (e) {
-    EasyLoading.dismiss();
-    if (context.mounted) {
-      EasyLoading.showError('Error zipping files');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error zipping files: $e')),
-      );
+      if (context.mounted) {
+        EasyLoading.showError('Error zipping files');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error zipping files: $e')),
+        );
+      }
     }
   }
-}
-
 
   Matrix4 getTransformForStep(int step, bool isMirrored) {
     if (!isMirrored) return Matrix4.identity();
@@ -192,7 +194,13 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                         if (referenceImagePath != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.asset(referenceImagePath, height: 220),
+                            child: Image.asset(
+                              referenceImagePath,
+                              height: MediaQuery.of(context).size.height *
+                                  0.35, // ~35% of screen height
+                              width: MediaQuery.of(context).size.width * 0.95,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         const SizedBox(height: 20),
                         Text(

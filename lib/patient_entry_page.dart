@@ -8,7 +8,8 @@ class PatientEntryPage extends StatefulWidget {
   final String clinicName;
   final int clinicId;
 
-  const PatientEntryPage({super.key, required this.clinicName, required this.clinicId});
+  const PatientEntryPage(
+      {super.key, required this.clinicName, required this.clinicId});
 
   @override
   State<PatientEntryPage> createState() => _PatientEntryPageState();
@@ -50,7 +51,8 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
     }
 
     try {
-      final folderName = "${name.replaceAll(' ', '_')}_${phone.substring(phone.length - 2)}";
+      final folderName =
+          "${name.replaceAll(' ', '_')}_${phone.substring(phone.length - 2)}";
       final baseDir = Directory('/storage/emulated/0/Documents/myapp');
       final patientFolder = Directory('${baseDir.path}/$folderName');
       if (!await patientFolder.exists()) {
@@ -134,22 +136,23 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Text(
-      'Clinic ID: ${widget.clinicId}',
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.teal,
-      ),
-    ),
-    Text(
-      'Patient ID: ${_patientCounter.toString().padLeft(3, '0')}',
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        color: Colors.deepOrange,
-      ),
-    ),
+          children: [
+            Text(
+              'Clinic ID: ${widget.clinicId}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
+            Text(
+              'Patient ID: ${_patientCounter.toString().padLeft(3, '0')}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepOrange,
+              ),
+            ),
             TextField(
               controller: nameController,
               decoration: const InputDecoration(labelText: 'Patient Name'),
@@ -162,7 +165,8 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
             DropdownButtonFormField<String>(
               value: selectedGender,
               items: ['Male', 'Female', 'Other']
-                  .map((gender) => DropdownMenuItem(value: gender, child: Text(gender)))
+                  .map((gender) =>
+                      DropdownMenuItem(value: gender, child: Text(gender)))
                   .toList(),
               onChanged: (value) {
                 setState(() {
