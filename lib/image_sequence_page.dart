@@ -4,6 +4,9 @@ import 'package:archive/archive_io.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'dart:ui' as ui;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/rendering.dart';
 
 class ImageSequencePage extends StatefulWidget {
   final String folderName;
@@ -58,29 +61,36 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
       });
     }
   }
+final GlobalKey _imageKey = GlobalKey();
 
-  Future<void> saveImageLocally() async {
-    const clinicId = 132;
-    const patientId = 14;
-    final serialNumber = currentStep + 1;
+ Future<void> saveImageLocally() async {
+  const clinicId = 132;
+  const patientId = 14;
+  final serialNumber = currentStep + 1;
 
-    final baseDir = Directory('/storage/emulated/0/Documents/myapp');
-    final patientFolder = Directory('${baseDir.path}/${widget.folderName}');
-    if (!await patientFolder.exists()) {
-      await patientFolder.create(recursive: true);
-    }
-
-    // final fileName = instructions[currentStep]
-    //         .replaceAll(' ', '_')
-    //         .replaceAll('(', '')
-    //         .replaceAll(')', '')
-    //         .replaceAll(':', '') +
-    //     '.jpg';
-    final fileName = '${clinicId}_${patientId}_$serialNumber.jpg';
-
-    final path = '${patientFolder.path}/$fileName';
-    await File(capturedImage!.path).copy(path);
+  final baseDir = Directory('/storage/emulated/0/Documents/myapp');
+  final patientFolder = Directory('${baseDir.path}/${widget.folderName}');
+  if (!await patientFolder.exists()) {
+    await patientFolder.create(recursive: true);
   }
+
+  final fileName = '${clinicId}_${patientId}_$serialNumber.jpg';
+  final path = '${patientFolder.path}/$fileName';
+
+  try {
+    RenderRepaintBoundary boundary = _imageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final pngBytes = byteData!.buffer.asUint8List();
+
+    final file = File(path);
+    await file.writeAsBytes(pngBytes);
+
+    print('Saved transformed image to $path');
+  } catch (e) {
+    print('Failed to save transformed image: $e');
+  }
+}
 
   Future<void> zipFolder() async {
     EasyLoading.show(status: 'Zipping images...');
@@ -116,6 +126,19 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
           SnackBar(content: Text('Error zipping files: $e')),
         );
       }
+    }
+  }
+
+  Matrix4 getTransformForStep(int step, bool isMirrored) {
+    if (!isMirrored) return Matrix4.identity();
+
+    // Customize behavior per step
+    if (step == 3) {
+      // Step 4 → Flip vertically
+      return Matrix4.identity()..scale(1.0, -1.0);
+    } else {
+      // Other steps → Mirror horizontally
+      return Matrix4.identity()..scale(-1.0, 1.0);
     }
   }
 
@@ -176,18 +199,20 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                         ),
                         const SizedBox(height: 20),
                         if (capturedImage != null)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.identity()
-                                ..scale(isMirrored ? -1.0 : 1.0, 1.0),
-                              child: Image.file(File(capturedImage!.path),
-                                  height: 250),
-                            ),
-                          )
-                        else
-                          const Text('No image captured yet'),
+  RepaintBoundary(
+    key: _imageKey,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Transform(
+        alignment: Alignment.center,
+        transform: getTransformForStep(currentStep, isMirrored),
+        child: Image.file(File(capturedImage!.path), height: 250),
+      ),
+    ),
+  )
+else
+  const Text('No image captured yet'),
+
                       ],
                     ),
                   ),
@@ -218,7 +243,9 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                         },
                         icon: const Icon(Icons.flip),
                         label: Text(
-                          isMirrored ? 'Original' : 'Mirror',
+                          isMirrored
+                              ? 'Original'
+                              : (currentStep == 3 ? 'Flip' : 'Mirror'),
                           style: const TextStyle(color: Color(0xFF7F56D9)),
                         ),
                         style: OutlinedButton.styleFrom(
