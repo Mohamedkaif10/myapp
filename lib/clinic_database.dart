@@ -21,6 +21,13 @@ class ClinicDatabase {
           clinicId INTEGER NOT NULL
         )
       ''');
+      await db.execute('''
+  CREATE TABLE patient_counter (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    counter INTEGER NOT NULL
+  )
+''');
+      await db.insert('patient_counter', {'counter': 0});
     });
   }
 
@@ -35,4 +42,14 @@ class ClinicDatabase {
     if (result.isNotEmpty) return result.first;
     return null;
   }
+  static Future<int> getPatientCounter() async {
+  final db = await database;
+  final result = await db.query('patient_counter', limit: 1);
+  return result.first['counter'] as int? ?? 1;
+}
+
+static Future<void> updatePatientCounter(int newValue) async {
+  final db = await database;
+  await db.update('patient_counter', {'counter': newValue}, where: 'id = ?', whereArgs: [1]);
+}
 }

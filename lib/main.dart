@@ -3,7 +3,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'clinic_entry_page.dart';
 import 'patient_entry_page.dart';
-
+import 'welcome_page.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
@@ -26,9 +26,9 @@ class MyApp extends StatelessWidget {
       await database.close(); // Don't forget to close the database
 
       if (clinics.isNotEmpty) {
-        final name = clinics.first['name'];
-        final id = clinics.first['id'];
-        return PatientEntryPage(clinicName: name, clinicId: id);
+         final name = clinics.first['name'] as String;
+         final id = clinics.first['id'] as int;
+        return WelcomePage(clinicName: name, clinicId: id);
       } else {
         return const ClinicEntryPage();
       }

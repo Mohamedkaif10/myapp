@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:excel/excel.dart' show Excel, TextCellValue;
 import 'dart:io';
 import 'image_sequence_page.dart';
+import 'clinic_database.dart';
 
 class PatientEntryPage extends StatefulWidget {
   final String clinicName;
@@ -21,7 +22,20 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
   final TextEditingController phoneController = TextEditingController();
   String selectedGender = 'Male';
 
-  int _patientCounter = 1; // ✅ Properly placed here
+  late int _patientCounter; // Will be initialized from DB
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPatientCounter();
+  }
+
+  Future<void> _loadPatientCounter() async {
+    final counter = await ClinicDatabase.getPatientCounter();
+    setState(() {
+      _patientCounter = counter;
+    });
+  }
 
   Future<void> saveToExcel() async {
     final name = nameController.text.trim();
@@ -103,7 +117,12 @@ class _PatientEntryPageState extends State<PatientEntryPage> {
           ),
         );
 
-        _patientCounter++; // ✅ Increment after use
+        final int nextCounter = _patientCounter + 1;
+        await ClinicDatabase.updatePatientCounter(nextCounter);
+
+        setState(() {
+          _patientCounter = nextCounter;
+        });
 
         nameController.clear();
         ageController.clear();
