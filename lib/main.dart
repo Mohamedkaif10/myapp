@@ -16,9 +16,15 @@ class MyApp extends StatelessWidget {
     try {
       final database = await openDatabase(
         join(await getDatabasesPath(), 'oralvis.db'),
-        onCreate: (db, version) {
-          return db.execute('CREATE TABLE clinic(id INTEGER PRIMARY KEY, name TEXT)');
-        },
+       onCreate: (db, version) {
+  return db.execute('''
+    CREATE TABLE clinic(
+      id INTEGER PRIMARY KEY,
+      name TEXT,
+      clinicId INTEGER
+    )
+  ''');
+},
         version: 1,
       );
 

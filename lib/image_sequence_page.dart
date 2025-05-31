@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -19,18 +20,9 @@ class ImageSequencePage extends StatefulWidget {
     required this.clinicId,
     required this.patientId,
   });
+
   @override
   State<ImageSequencePage> createState() => _ImageSequencePageState();
-}
-
-Future<void> zipFolderInBackground(String folderName) async {
-  final folderPath = '/storage/emulated/0/Documents/myapp/$folderName';
-  final zipFilePath = '/storage/emulated/0/Documents/myapp/${folderName}.zip';
-
-  final zipEncoder = ZipFileEncoder();
-  zipEncoder.create(zipFilePath);
-  await zipEncoder.addDirectory(Directory(folderPath));
-  zipEncoder.close();
 }
 
 class _ImageSequencePageState extends State<ImageSequencePage> {
@@ -54,11 +46,13 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
     'Left cheek (buccal view)': 'assets/images/7.png',
   };
 
+  final Map<String, Uint8List> imageMemoryMap = {};
   bool isMirrored = false;
   int currentStep = 0;
   XFile? capturedImage;
   final ImagePicker picker = ImagePicker();
   bool _isLoading = false;
+  final GlobalKey _imageKey = GlobalKey();
 
   Future<void> captureImage() async {
     final XFile? image = await picker.pickImage(source: ImageSource.camera);
@@ -69,21 +63,11 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
     }
   }
 
-  final GlobalKey _imageKey = GlobalKey();
-
-  Future<void> saveImageLocally() async {
+  Future<void> saveImageToMemory() async {
     final clinicId = widget.clinicId;
-    const patientId = 14;
+    final patientId = widget.patientId;
     final serialNumber = currentStep + 1;
-
-    final baseDir = Directory('/storage/emulated/0/Documents/myapp');
-    final patientFolder = Directory('${baseDir.path}/${widget.folderName}');
-    if (!await patientFolder.exists()) {
-      await patientFolder.create(recursive: true);
-    }
-
-    final fileName = '${clinicId}_${patientId}_$serialNumber.jpg';
-    final path = '${patientFolder.path}/$fileName';
+    final fileName = '${clinicId}_${patientId}_$serialNumber.png';
 
     try {
       RenderRepaintBoundary boundary =
@@ -92,79 +76,84 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
       ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
       final pngBytes = byteData!.buffer.asUint8List();
-
-      final file = File(path);
-      await file.writeAsBytes(pngBytes);
-
-      print('Saved transformed image to $path');
+      imageMemoryMap[fileName] = pngBytes;
+      print('Stored $fileName in memory map');
     } catch (e) {
-      print('Failed to save transformed image: $e');
+      print('Failed to render image: $e');
     }
   }
 
-  Future<void> zipFolder() async {
-    EasyLoading.show(status: 'Zipping images...');
-    try {
-      await compute(zipFolderInBackground, widget.folderName);
-      if (context.mounted) {
-        EasyLoading.dismiss();
-        EasyLoading.showSuccess('Zipped successfully!');
+Future<void> zipImagesFromMemory() async {
+  EasyLoading.show(status: 'Zipping images...');
+  try {
+    final zipPath = '/storage/emulated/0/Documents/myapp/${widget.folderName}.zip';
+    final archive = Archive();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green[600],
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 10),
-                Expanded(
-                    child: Text('Thank you! All data captured and zipped.')),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+    // Add all image bytes from memory to archive
+    for (final entry in imageMemoryMap.entries) {
+      archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
+    }
 
-        // Pop back to ClinicEntryPage and go forward to PatientEntryPage
-        Navigator.of(context).pop(); // pop ImageSequencePage
-        Navigator.of(context).pop(); // pop PatientEntryPage
+    // Optionally add Excel file from disk
+    final excelPath = '/storage/emulated/0/Documents/myapp/${widget.folderName}.xlsx';
+    final excelFile = File(excelPath);
+    if (await excelFile.exists()) {
+      final excelBytes = await excelFile.readAsBytes();
+      archive.addFile(ArchiveFile('report.xlsx', excelBytes.length, excelBytes));
+    }
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PatientEntryPage(
-              clinicName: 'Unknown',
-              clinicId: widget.clinicId,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
+    // Encode the archive and save it to disk
+    final zipData = ZipEncoder().encode(archive);
+    final zipFile = File(zipPath);
+    await zipFile.writeAsBytes(zipData!);
+
+    if (context.mounted) {
       EasyLoading.dismiss();
-      if (context.mounted) {
-        EasyLoading.showError('Error zipping files');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error zipping files: $e')),
-        );
-      }
+      EasyLoading.showSuccess('Zipped successfully!');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.green[600],
+          content: Row(
+            children: const [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 10),
+              Expanded(child: Text('Thank you! All data captured and zipped.')),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PatientEntryPage(
+            clinicName: 'Unknown',
+            clinicId: widget.clinicId,
+          ),
+        ),
+      );
+    }
+  } catch (e) {
+    EasyLoading.dismiss();
+    if (context.mounted) {
+      EasyLoading.showError('Error zipping files');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error zipping files: $e')),
+      );
     }
   }
+}
+
 
   Matrix4 getTransformForStep(int step, bool isMirrored) {
     if (!isMirrored) return Matrix4.identity();
-
-    if (step == 3 || step == 4) {
-      // Flip vertically
-      return Matrix4.identity()..scale(1.0, -1.0);
-    } else if (step == 1 || step == 2) {
-      // Mirror horizontally
-      return Matrix4.identity()..scale(-1.0, 1.0);
-    }
-
-    // No transform for other steps
+    if (step == 3 || step == 4) return Matrix4.identity()..scale(1.0, -1.0);
+    if (step == 1 || step == 2) return Matrix4.identity()..scale(-1.0, 1.0);
     return Matrix4.identity();
   }
 
@@ -196,8 +185,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                             borderRadius: BorderRadius.circular(12),
                             child: Image.asset(
                               referenceImagePath,
-                              height: MediaQuery.of(context).size.height *
-                                  0.35, // ~35% of screen height
+                              height: MediaQuery.of(context).size.height * 0.35,
                               width: MediaQuery.of(context).size.width * 0.95,
                               fit: BoxFit.cover,
                             ),
@@ -213,22 +201,21 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 20),
-                        ElevatedButton.icon(
-                          onPressed: captureImage,
-                          icon: const Icon(Icons.camera_alt),
-                          label: const Text('Capture Image'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3FBF8B),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 24,
+                        if (capturedImage == null)
+                          ElevatedButton.icon(
+                            onPressed: captureImage,
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Capture Image'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3FBF8B),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 24),
                             ),
                           ),
-                        ),
                         const SizedBox(height: 20),
                         if (capturedImage != null)
                           RepaintBoundary(
@@ -237,8 +224,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                               borderRadius: BorderRadius.circular(12),
                               child: Transform(
                                 alignment: Alignment.center,
-                                transform: getTransformForStep(
-                                    currentStep, isMirrored),
+                                transform: getTransformForStep(currentStep, isMirrored),
                                 child: Image.file(File(capturedImage!.path),
                                     height: 250),
                               ),
@@ -256,22 +242,16 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                     children: [
                       OutlinedButton.icon(
                         onPressed: captureImage,
-                        icon:
-                            const Icon(Icons.refresh, color: Color(0xFF7F56D9)),
+                        icon: const Icon(Icons.refresh, color: Color(0xFF7F56D9)),
                         label: const Text('Retake',
                             style: TextStyle(color: Color(0xFF7F56D9))),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFF7F56D9)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
-                      if (currentStep == 1 ||
-                          currentStep == 2 ||
-                          currentStep == 3 ||
-                          currentStep == 4)
+                      if ([1, 2, 3, 4].contains(currentStep))
                         OutlinedButton.icon(
                           onPressed: () {
                             setState(() {
@@ -280,24 +260,18 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                           },
                           icon: const Icon(Icons.flip),
                           label: Text(
-                            isMirrored
-                                ? 'Original'
-                                : (currentStep == 3 || currentStep == 4
-                                    ? 'Flip'
-                                    : 'Mirror'),
+                            isMirrored ? 'Original' : 'Mirror',
                             style: const TextStyle(color: Color(0xFF7F56D9)),
                           ),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF7F56D9)),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
                       ElevatedButton.icon(
                         onPressed: () async {
-                          await saveImageLocally();
+                          await saveImageToMemory();
                           if (currentStep < instructions.length - 1) {
                             setState(() {
                               currentStep++;
@@ -305,7 +279,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                               isMirrored = false;
                             });
                           } else {
-                            await zipFolder();
+                            await zipImagesFromMemory();
                           }
                         },
                         icon: const Icon(Icons.save),
@@ -313,10 +287,8 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3FBF8B),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                       ),
                     ],
@@ -341,8 +313,7 @@ class _ImageSequencePageState extends State<ImageSequencePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF3FBF8B)),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3FBF8B)),
                     ),
                     const SizedBox(height: 16),
                     Text(
